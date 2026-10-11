@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naija Life Simulator</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101828;color:white;font-family:Arial,sans-serif}
+header{padding:12px 16px;background:#172554}
+h2{margin:0;font-size:20px}
+header p{margin:5px 0 0;color:#dbeafe;font-size:12px}
+#game{display:block;width:100%;height:58vh;min-height:300px;background:#f7a45b}
+#panel{padding:14px;text-align:center}
+input,button{font-size:16px;border:0;border-radius:10px;padding:12px}
+input{width:100%;margin-bottom:9px}
+button{background:#fbbf24;color:#172033;font-weight:bold;cursor:pointer}
+#start{width:100%}
+#status{line-height:1.6;margin:8px 0;font-size:14px}
+#controls{display:flex;justify-content:space-between;gap:12px;margin-top:12px}
+#controls button{width:32%;font-size:23px;touch-action:none;user-select:none}
+#hint{font-size:12px;color:#cbd5e1;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <h2>🇳🇬 NAIJA LIFE SIMULATOR</h2>
+  <p>Your story. Your hustle. Your destiny.</p>
+</header>
+
+<canvas id="game"></canvas>
+
+<div id="panel">
+  <div id="creator">
+    <input id="playerName" maxlength="18" placeholder="Enter your character's name">
+    <button id="start">START YOUR LIFE 🔥</button>
+  </div>
+  <div id="status">Create your character to begin.</div>
+  <div id="controls">
+    <button id="left" aria-label="Walk left">◀</button>
+    <button id="talk">INTERACT</button>
+    <button id="right" aria-label="Walk right">▶</button>
+  </div>
+  <div id="hint">Use ◀ ▶ to explore the neighborhood.</div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const statusBox = document.getElementById("status");
+const WORLD = 3600;
+let w=0,h=0,camera=0,started=false;
+let name="Player",family="",money=0,message="";
+const player={x:100,y:0,skin:"#7b432a",speed:3.2};
+let moving=0;
+
+function resize(){
+  const r=canvas.getBoundingClientRect();
+  const d=Math.min(window.devicePixelRatio||1,2);
+  w=r.width;h=r.height;
+  canvas.width=Math.round(w*d);
+  canvas.height=Math.round(h*d);
+  ctx.setTransform(d,0,0,d,0,0);
+  draw();
+}
+window.addEventListener("resize",resize);
+
+function text(t,x,y,size=14,color="#fff"){
+  ctx.font="bold "+size+"px Arial";
+  ctx.fillStyle=color;
+  ctx.fillText(t,x,y);
+}
+function building(x,width,height,color,shop=false){
+  const ground=h*.69;
+  const bx=x-camera;
+  if(bx+width< -10||bx>w+10)return;
+  ctx.fillStyle=color;
+  ctx.fillRect(bx,ground-height,width,height);
+  ctx.fillStyle="#ffe0a3";
+  ctx.fillRect(bx+8,ground-height+10,width-16,8);
+  for(let xx=bx+12;xx<bx+width-10;xx+=32){
+    ctx.fillStyle="#24445b";
+    ctx.fillRect(xx,ground-height+30,17,25);
+  }
+  if(shop){
+    ctx.fillStyle="#facc15";
+    ctx.fillRect(bx-3,ground-height+height*.55,width+6,8);
+    text("SHOP",bx+8,ground-height+height*.55-5,11,"#fff");
+    ctx.fillStyle="#75452d";
+    ctx.fillRect(bx+width*.35,ground-35,width*.3,35);
+  }
+  ctx.fillStyle="#49372e";
+  ctx.fillRect(bx-4,ground-height-5,width+8,6);
+}
+function palm(x,y){
+  const px=x-camera;
+  if(px< -60||px>w+60)return;
+  ctx.strokeStyle="#69452c";ctx.lineWidth=8;
+  ctx.beginPath();ctx.moveTo(px,y);ctx.lineTo(px-3,y-55);ctx.stroke();
+  ctx.strokeStyle="#176d45";ctx.lineWidth=6;
+  for(let i=0;i<7;i++){
+    const a=Math.PI+i*Math.PI/3;
+    ctx.beginPath();ctx.moveTo(px-3,y-55);
+    ctx.lineTo(px+Math.cos(a)*32,y-55+Math.sin(a)*20);
+    ctx.stroke();
+  }
+}
+function drawPlayer(){
+  const px=player.x-camera, ground=h*.79;
+  ctx.fillStyle="#0003";
+  ctx.beginPath();ctx.ellipse(px,ground,18,5,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#202b3b";ctx.lineWidth=7;
+  ctx.beginPath();ctx.moveTo(px-5,ground-23);ctx.lineTo(px-7,ground-3);
+  ctx.moveTo(px+5,ground-23);ctx.lineTo(px+8,ground-3);ctx.stroke();
+  ctx.fillStyle="#1687a7";ctx.fillRect(px-12,ground-52,24,30);
+  ctx.fillStyle=player.skin;
+  ctx.beginPath();ctx.arc(px,ground-62,10,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#171717";ctx.fillRect(px-10,ground-72,20,6);
+  ctx.fillStyle="#fff";
+  ctx.fillRect(px+3,ground-64,3,3);
+  text(name.slice(0,12),px-22,ground-82,11);
+}
+function draw(){
+  if(!w||!h)return;
+  const sky=ctx.createLinearGradient(0,0,0,h);
+  sky.addColorStop(0,"#f27c72");
+  sky.addColorStop(.52,"#ffc477");
+  sky.addColorStop(1,"#ffe2a0");
+  ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+  ctx.fillStyle="#ffe8a1";
+  ctx.beginPath();ctx.arc(w*.78,h*.18,34,0,Math.PI*2);ctx.fill();
+
+  // Distant Lagos skyline
+  for(let i=0;i<18;i++){
+    const x=((i*103-camera*.18)%(w+120)+w+120)%(w+120)-60;
+    ctx.fillStyle=i%2?"#b96968":"#92677c";
+    ctx.fillRect(x,h*.43-(i%3)*16,48,h*.25+(i%3)*16);
+  }
+  const buildings=[
+    [40,120,100,"#df8a62",true],
+    [230,150,140,"#e8c18a",false],
+    [450,115,105,"#65a68a",true],
+    [650,155,165,"#f0b37e",false],
+    [900,130,115,"#d17b62",true],
+    [1120,170,145,"#e2bd80",false],
+    [1400,125,110,"#73a58d",true],
+    [1640,150,160,"#e7a16b",false],
+    [1900,125,115,"#d37b68",true],
+    [2150,160,150,"#e8c08a",false],
+    [2440,130,115,"#64a28c",true],
+    [2720,150,160,"#db9169",false],
+    [3000,140,120,"#e7c08c",true],
+    [3300,180,175,"#70a78e",false]
+  ];
+  buildings.forEach(b=>building(...b));
+  [170,580,850,1300,1750,2050,2520,2940,3240].forEach(x=>palm(x,h*.68));
+
+  // Street and pavement
+  ctx.fillStyle="#e7c9a0";ctx.fillRect(0,h*.69,w,h*.10);
+  ctx.fillStyle="#56535b";ctx.fillRect(0,h*.79,w,h*.21);
+  ctx.fillStyle="#f9d66b";
+  for(let x=-(camera%110);x<w;x+=110)ctx.fillRect(x,h*.90,52,4);
+
+  // Passing danfo
+  const busX=((650-camera*.7)%(w+180)+w+180)%(w+180)-100;
+  ctx.fillStyle="#f4c52b";ctx.fillRect(busX,h*.73,90,35);
+  ctx.fillStyle="#20394b";
+  ctx.fillRect(busX+8,h*.745,19,12);
+  ctx.fillRect(busX+33,h*.745,19,12);
+  ctx.fillRect(busX+59,h*.745,18,12);
+  ctx.fillStyle="#191c25";
+  ctx.beginPath();ctx.arc(busX+20,h*.77,6,0,7);ctx.arc(busX+72,h*.77,6,0,7);ctx.fill();
+
+  drawPlayer();
+  if(!started){
+    ctx.fillStyle="#111827bb";ctx.fillRect(12,12,Math.min(w-24,310),48);
+    text("WELCOME TO THE STREETS",23,32,14);
+    text("Your journey starts here.",23,49,12);
+  }
+  requestAnimationFrame(()=>{});
+}
+function update(){
+  if(started&&moving){
+    player.x=Math.max(25,Math.min(WORLD-35,player.x+moving*player.speed));
+    camera=Math.max(0,Math.min(WORLD-w,player.x-w*.38));
+  }
+  draw();
+  requestAnimationFrame(update);
+}
+function setMessage(s){message=s;statusBox.textContent=s}
+document.getElementById("start").onclick=()=>{
+  name=document.getElementById("playerName").value.trim()||"Great";
+  // 75% humble family, 25% wealthy family
+  family=Math.random()<.75?"HUMBLE FAMILY":"WEALTHY FAMILY";
+  money=family==="HUMBLE FAMILY"?5000:2500000;
+  player.x=100;camera=0;started=true;
+  document.getElementById("creator").style.display="none";
+  setMessage(name+" | "+family+" | Starting cash: ₦"+money.toLocaleString("en-NG"));
+  document.getElementById("hint").textContent="Explore the street. More jobs and shops coming soon!";
+  draw();
+};
+function bindMove(id,direction){
+  const b=document.getElementById(id);
+  const down=e=>{e.preventDefault();moving=direction};
+  const up=e=>{e.preventDefault();if(moving===direction)moving=0};
+  b.addEventListener("pointerdown",down);
+  b.addEventListener("pointerup",up);
+  b.addEventListener("pointercancel",up);
+  b.addEventListener("pointerleave",up);
+}
+bindMove("left",-1);bindMove("right",1);
+document.getElementById("talk").onclick=()=>{
+  if(!started){setMessage("Enter a name and start your life first!");return}
+  const places=[
+    "You greet a shopkeeper. New friendships are coming soon!",
+    "A danfo passes by. Lagos never sleeps!",
+    "You spot a possible hustle. Jobs are coming soon!",
+    "Explore the neighborhood. Your story is just beginning!"
+  ];
+  setMessage(places[Math.floor(Math.random()*places.length)]);
+};
+window.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")moving=-1;
+  if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")moving=1;
+});
+window.addEventListener("keyup",e=>{
+  if(["ArrowLeft","ArrowRight","a","d"].includes(e.key.toLowerCase()))moving=0;
+});
+resize();
+update();
+</script>
+</body>
+</html>
